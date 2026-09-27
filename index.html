@@ -1,0 +1,29 @@
+<!doctype html><html lang="en" dir="ltr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Student Results</title><style>
+:root{--bg:#f4f7fb;--card:#fff;--text:#101828;--muted:#667085;--primary:#2563eb;--danger:#b42318;--border:#e4e7ec}*{box-sizing:border-box}body{margin:0;font-family:Tahoma,Arial,sans-serif;background:var(--bg);color:var(--text)}button,input{font:inherit}.wrap{width:min(1100px,94%);margin:30px auto}.card{background:var(--card);border:1px solid var(--border);border-radius:24px;padding:24px;box-shadow:0 12px 35px rgba(16,24,40,.08);margin-bottom:18px}.brand{text-align:center}.brand h1{margin:0 0 8px}.muted{color:var(--muted)}input{width:100%;padding:14px;border:1px solid var(--border);border-radius:14px;margin:7px 0 12px}button{border:0;border-radius:13px;padding:13px 18px;cursor:pointer;font-weight:800}.primary{background:var(--primary);color:#fff}.secondary{background:#eaf0ff;color:#174ea6}.danger{background:#fee4e2;color:var(--danger)}.hidden{display:none!important}.msg{padding:14px;border-radius:14px;margin:12px 0;background:#fff3f2;color:var(--danger);white-space:pre-wrap;overflow:auto}.ok{background:#ecfdf3;color:#027a48}.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:15px 0}.search{flex:1;min-width:220px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.stat{background:#f8fafc;border-radius:18px;padding:20px;text-align:center}.stat b{font-size:30px;display:block}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;min-width:600px}th,td{padding:14px;border-bottom:1px solid var(--border);text-align:right}th{background:#f8fafc}.empty{text-align:center;padding:35px;color:var(--muted)}@media(max-width:650px){.stats{grid-template-columns:1fr}.wrap{width:96%;margin:15px auto}}
+</style></head><body><main class="wrap"><section id="dashboard"><div class="card"><div class="brand"><h1>Student Results</h1><div class="muted">Name + Phone Number + Result</div></div><div id="msg" class="msg hidden"></div><div class="toolbar"><input id="search" class="search" placeholder="Search by name or phone number"><button id="refresh" class="primary">Refresh</button><button id="csv" class="secondary">Export CSV</button></div></div><div class="card"><div class="stats"><div class="stat"><b id="count">0</b><span>Students</span></div><div class="stat"><b id="avg">0%</b><span>Average</span></div><div class="stat"><b id="max">0%</b><span>Highest Result</span></div></div></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Name</th><th>Phone Number</th><th>Result</th></tr></thead><tbody id="rows"></tbody></table></div></div></section></main><script>
+const SUPABASE_URL='https://tnqiheclnnobncnzoldp.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY='sb_publishable_8t9_P0slPk8c8wul6DTVsw_UaFDRmqy';
+let all=[];
+const $=id=>document.getElementById(id);
+function esc(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\'':'&#39;','"':'&quot;'}[c]))}
+function msg(t,ok=false){$('msg').textContent=t;$('msg').className='msg '+(ok?'ok':'')}
+async function api(path,opts={}){
+ const headers={apikey:SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json',...(opts.headers||{})};
+ const r=await fetch(SUPABASE_URL+path,{...opts,headers});
+ if(!r.ok) throw new Error(await r.text());
+ return r.status===204?null:r.json();
+}
+function render(){
+ const q=($('search').value||'').trim().toLowerCase();
+ const rows=all.filter(x=>String(x.student_name||'').toLowerCase().includes(q)||String(x.student_phone||'').toLowerCase().includes(q));
+ $('count').textContent=rows.length;
+ const avg=rows.length?rows.reduce((a,x)=>a+Number(x.score||0),0)/rows.length:0;
+ $('avg').textContent=Math.round(avg)+'%';
+ $('max').textContent=(rows.length?Math.max(...rows.map(x=>Number(x.score||0))):0)+'%';
+ $('rows').innerHTML=rows.length?rows.map(x=>'<tr><td>'+esc(x.student_name)+'</td><td>'+esc(x.student_phone)+'</td><td><b>'+Number(x.score||0)+'%</b></td></tr>').join(''):'<tr><td colspan="3" class="empty">No results yet</td></tr>';
+}
+async function load(){try{all=await api('/rest/v1/student_results?select=student_name,student_phone,score&order=id.desc');render();msg('Results updated successfully.',true)}catch(e){msg('Database connection error: '+e.message)}}
+$('refresh').onclick=load;$('search').oninput=render;
+$('csv').onclick=()=>{const header=['Name','Phone Number','Result'];const lines=[header,...all.map(x=>[x.student_name,x.student_phone,x.score+'%'])].map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(','));const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+lines.join('\n')],{type:'text/csv;charset=utf-8'}));a.download='student-results.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
+load();
+</script></body></html>
